@@ -1,0 +1,1 @@
+Code and data used for the experiments on the open architecture for mobile sensors platform. The code includes the ROS2 packages, the raw data of the flights from the Pixhawk and the LIDAR, and the Python scripts for data processing.
