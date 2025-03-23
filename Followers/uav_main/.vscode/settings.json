@@ -1,0 +1,30 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/ubuntu/ros2_ws/build/uav_main",
+        "/home/fabian/Documents/code_drone_jsss/ros2_ws/install/uav_main/lib/python3.10/site-packages",
+        "/home/ubuntu/ros2_ws/build/my_first_pkg",
+        "/home/fabian/Documents/code_drone_jsss/ros2_ws/install/my_first_pkg/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/uav_inputs",
+        "/home/fabian/ros2_ws/install/uav_inputs/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/qualisys",
+        "/home/fabian/ros2_ws/install/qualisys/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/optitrack",
+        "/home/fabian/ros2_ws/install/optitrack/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/ubuntu/ros2_ws/build/uav_main",
+        "/home/fabian/Documents/code_drone_jsss/ros2_ws/install/uav_main/lib/python3.10/site-packages",
+        "/home/ubuntu/ros2_ws/build/my_first_pkg",
+        "/home/fabian/Documents/code_drone_jsss/ros2_ws/install/my_first_pkg/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/uav_inputs",
+        "/home/fabian/ros2_ws/install/uav_inputs/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/qualisys",
+        "/home/fabian/ros2_ws/install/qualisys/lib/python3.10/site-packages",
+        "/home/fabian/ros2_ws/build/optitrack",
+        "/home/fabian/ros2_ws/install/optitrack/lib/python3.10/site-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}
