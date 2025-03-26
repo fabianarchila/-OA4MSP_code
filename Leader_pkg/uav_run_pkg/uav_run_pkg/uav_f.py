@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 
 import rclpy
-import time  #this was for sleep() but the other process are stoped apparently. I created own self.sleep 
+import time 
 
 from rclpy.node import Node
-#from example_interfaces.msg import Int64
 from math import atan2, pow, sqrt, degrees, radians, sin, cos
 from functools import partial # this is to the SstreamRate service call
 
-# list of topics and messages wiki.ros.org/mavors
 from geometry_msgs.msg import Pose, PoseStamped, Point, Quaternion
 from geographic_msgs.msg import GeoPoseStamped, GeoPoint
 from nav_msgs.msg import Odometry  
@@ -25,19 +23,14 @@ from sensor_msgs.msg import NavSatFix # for global_postition/global
 from sensor_msgs.msg import TimeReference #for gps time
 from pygeodesy.geoids import GeoidPGM # to measure correct altitude
 from std_msgs.msg import String # used to send messages to mqtt
-#from gpiozero import MCP3202
 
 _egm96 = GeoidPGM('/usr/share/GeographicLib/geoids/egm96-5.pgm', kind=-3)
-
-
-
 
 class MiNodo(Node):
     def __init__(self):
         super().__init__("uav") # type: ignore # node name
         #  define here the namespace instead of /mavros/, example for the following launch:
         #  ros2 launch mavros apm.launch dev_url:=ip_address:15200 namespace:=hola 
-        #  self.namespace = "/hola"
         self.namespace = "/uavLeader"  
         self.get_logger().info("Nodo uav creado")
         self.time_0 = 0
@@ -45,7 +38,7 @@ class MiNodo(Node):
         self.c_pose = Odometry()
         self.global_position = NavSatFix()
         self.waypoint_global = GeoPoseStamped()
-        self.MAS_position = GeoPoseStamped() # my position shared to others in the MultiAgentSystem
+        self.MAS_position = GeoPoseStamped() # not used
         self.mqtt_msg = String()
         self.alt0 = 0.0 # initial altitude for taking off
         self.alt_after_T_Off_geoid=0 # initial altitude in geoidesic after takeoff
@@ -54,7 +47,7 @@ class MiNodo(Node):
         self.frec = 100.0 # (Hz), con esto, spin_once hace un delay de 10ms
         self.looprate = self.create_rate(self.frec, self.get_clock())
         self.time_gps = TimeReference()
-        #self.smoke_level = MCP3202(0)
+        #self.smoke_level = MCP3202(0) #smoke sensor
 
         #self.publisher2_ = self.create_publisher(Int64,"number_count",2)
         #self.create_timer( 1 , self.publicar )
@@ -67,7 +60,7 @@ class MiNodo(Node):
             qos_profile=SENSOR_QOS
         )
 
-        #publisher uav1/GPSposition topic (este MAS era para compartir con otros UAVs pero no es necesario)  
+        #publisher uav1/GPSposition topic 
         self.MAS_pub = self.create_publisher(
             GeoPoseStamped,
             "/uav1/GPSposition",
@@ -81,20 +74,6 @@ class MiNodo(Node):
             "/ros2mqtt/pos",
             1 
         )        
-        """
-        #publisher smoke_sensor topic
-        self.smoke_level_pub = self.create_publisher(
-            String,
-            "/smoke",
-            1
-        )
-        """
-        #self.subscriber_=self.create_subscription(
-        #    Int64, 
-        #    "number",
-        #    self.callback_subscribir, 
-        #    2
-        #)
         ###################################
         # SUBSCRIBERS
         ###################################
@@ -133,13 +112,6 @@ class MiNodo(Node):
             self.smoke_cb,
             1
         ) 
-        #subscriber to sys status from FCU
-        #self.FCUstatus_sub=self.create_subscription(
-        #    ???,
-        #    self.namespace+"/statustext/recv", 
-        #    self.statustext_cb,
-        #    1
-        #)
                  
         #self.create_timer( 10.0 , self.timer_callback)
         self.counter_=0
@@ -176,15 +148,6 @@ class MiNodo(Node):
 
         self.topic_ping_ros.publish(self.mqtt_msg)
            
-        
-    #def callback_subscribir(self,msg):
-    #    #valor=str(msg.data)
-    #    self.get_logger().info(str(msg.data))
-    #    self.cont+=msg.data
-    #    print("esto vale contador: {}" . format(self.cont))
-    #    var64= Int64()
-    #    var64.data = self.cont
-    #    self.publisher2_.publish(var64)
     
     def state_cb(self,msg):
         self.current_state = msg     
@@ -329,82 +292,6 @@ class MiNodo(Node):
             self.get_logger().error("Service call failed %r" % (e,))
         self.get_logger().info("response from stream service: "+str(response))
 
-    def ROI(self, lat, lon, alt):
-        """ ROI-region of interest (mavlink command 195) 
-         """
-        client = self.create_client(CommandInt, self.namespace +"/cmd/command_int")
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('mavlink service comand_int not available, trying again...')
-        req = CommandInt.Request()
-        req.command = 195 # 195=MAV_CMD_DO_SET_ROI_LOCATION (mavlink documentation)
-        req.frame = 6 # reference frame xyz = lat, lon, altitude relative to home
-        req.param2 =0.0 # gimbal device ID
-        req.param2 =0.0
-        req.param3 =0.0
-        req.param4 =0.0 
-        req.x = (int)(lat*1e7) #517691000  #latitude
-        req.y = (int)(lon*1e7) #143235800  #longitud
-        req.z = alt #5.0        #altitude relative to home (float)
-        #self.get_logger().info("xyz_ROI = "+str(req.x)+", "+str(req.y)+", "+str(req.z))
-        future = client.call_async(req)
-        future.add_done_callback(partial(self.ROI_cb))
-
-    def ROI_cb(self, future):
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().error("Service call failed %r" % (e,))
-        self.get_logger().info("response to ROI: "+str(response))
-
-    def ROI_off(self):
-        """ cancel ROI-region of interest (mavlink command 197) 
-         """
-        client = self.create_client(CommandInt, self.namespace +"/cmd/command_int")
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('mavlink service comand_int not available, trying again...')
-        req = CommandInt.Request()
-        req.command = 197 # 197=MAV_CMD_DO_SET_ROI_NONE (mavlink documentation)
-        req.frame = 6 # reference frame xyz = lat, lon, altitude relative to home
-        req.param1 =0.0 # gimbal device ID
-        req.param2 =0.0
-        req.param3 =0.0
-        req.param4 =0.0 
-        future = client.call_async(req)
-        future.add_done_callback(partial(self.ROI_off_cb))
-
-    def ROI_off_cb(self, future):
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().error("Service call failed %r" % (e,))
-        self.get_logger().info("response to ROI_off: "+str(response))
-
-    def Loiter_turns(self,lat, lon, alt, num_turns, radius):
-        """ do circles around a position (mavlink command 18)
-        args: lat, lon, alt, num_turns, radius 
-         """
-        client = self.create_client(CommandInt, self.namespace +"/cmd/command_int")
-        while not client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().warn('mavlink service comand_int not available, trying again...')
-        req = CommandInt.Request()
-        req.command = 18 # 197=MAV_CMD_DO_SET_ROI_NONE (mavlink documentation)
-        req.frame = 6 # reference frame xyz = lat, lon, altitude relative to home
-        req.param1 =(float)(num_turns) # number of turns
-        req.param2 =0.0 #leave circle only once heading towards next wp
-        req.param3 =(float)(radius) 
-        req.param4 =0.0  #Xtrack location
-        req.x = (int)(lat*1e7) #517691000  #latitude
-        req.y = (int)(lon*1e7) #143235800  #longitud
-        req.z = (float)(alt) #5.0        #altitude relative to home (float)
-        future = client.call_async(req)
-        future.add_done_callback(partial(self.Loiter_turns_cb))
-
-    def Loiter_turns_cb(self, future):
-        try:
-            response = future.result()
-        except Exception as e:
-            self.get_logger().error("Service call failed %r" % (e,))
-        self.get_logger().info("response to Loiter_turns: "+str(response))
 
     def geoid_hight(self, lat,lon):
         """Calculates AMSL to ellipsoid conversion offset.
@@ -435,13 +322,6 @@ class MiNodo(Node):
         while ii<int(self.frec*secs): #delay s
             rclpy.spin_once(self)
             ii+=1
-    """ 
-    def smoke_timer(self):
-        print("Smoke level (V): {}".format(self.smoke_level.value))
-        msg = String()
-        msg.data = str(self.smoke_level.value)
-        self.smoke_level_pub.publish(msg)
-    """       
 
 
 def main(args=None):
@@ -451,15 +331,11 @@ def main(args=None):
     # creation of node
     node=MiNodo()
     
-    v=4.1
-    print("main version ={}" . format(v))
     node.time_0 = node.get_clock().now().to_msg().sec
     print("Init time: {}".format(node.time_0))
     
     #request service stream rate start
     node.start_stream()
-
-    #node.create_timer(1,node.smoke_timer)
 
     # Wait for FCU connection.
     node.wait4connect()
@@ -483,29 +359,12 @@ def main(args=None):
     print("Geod altitude after  takeoff: {}".format(node.global_position))
 
     #calculate the floor compensation
-    # node.alt_after_T_Off_geoid = node.global_position.altitude
-    # node.floor_geoid = node.alt_after_T_Off_geoid-node.alt0
     node.floor_geoid = node.global_position.altitude
     print("Floor in geoid is: {}".format(node.floor_geoid))
     
    
-    # rospy.Rate(1) # in ros2 this is done with the loop_rate but not sure how, I can use the sleep() that I made
-
     # Specify some global waypoints
-    """goals = [[51.76910,14.32358,node.alt0],   # WP 1
-            [51.76914,14.32360,node.alt0],  # WP 2
-            [51.76916,14.32351,node.alt0],    # WP 3
-            [51.76911,14.32350,node.alt0],   # WP 4
-            [51.76910,14.32358,node.alt0]]  # Back to WP 1"""
-    #first square presented for JSSS
-    """goals =[[51.76910,14.32358,node.alt0],  # WP 1
-            [51.76913,14.32358,node.alt0],  # WP 2
-            [51.76913,14.32355,node.alt0],  # WP 3
-            [51.76910,14.32355,node.alt0],  # WP 4
-            [51.76910,14.32358,node.alt0]]  # Back to WP 1
-    """
-    # [51.769018258, 14.3231605169,node.alt0],  # WP 2
-    # second option, for a straight line near the trees with LIDAR
+    # square
     goals =[[51.768998000, 14.3233080000,node.alt0],  # WP 1
             [51.7690358, 14.32301660,node.alt0],  # WP 3
             [51.7692120, 14.32306877,node.alt0],  # WP 4
@@ -536,18 +395,7 @@ def main(args=None):
             i+=1
     print("Waypoints completed!")
 
-    """node.Loiter_turns(51.7691,14.32358,5.0,3,3)
-    node.ROI_off() # cancel any previous ROI
-    node.sleep(10)
-    node.ROI(51.76914,14.32360,5.0)
-    node.sleep(10)
-    node.ROI_off"""
     node.sleep(60)
-    #time_1 = node.get_clock().now().to_msg().sec
-    #time_2= 0
-    #while time_2 < time_1+20: #secs
-    #    time_2 = node.get_clock().now().to_msg().sec
-    #    node.sleep(1)
        
     # request service landing
     node.landing()
